@@ -35,11 +35,11 @@ main() {
       ..write('>')
       ..writeln('innermost');
     c.copyInto(a);
-    print(a);
-    expect(a.lastLine.text, '  >innermost');
+    expect(a.lastLine.text, '>innermost');
+    expect(a.lastLine.span.start.column, 2);
     expect(a.lastLine.lastSpan.start.line, 4);
     expect(a.lastLine.lastSpan.start.column, 3);
     expect(a.lastLine.lastSpan.end.line, 4);
-    expect(a.lastLine.lastSpan.end.column, 14);
+    expect(a.lastLine.lastSpan.end.column, 12);
   });
 }

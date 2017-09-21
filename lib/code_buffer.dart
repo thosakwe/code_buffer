@@ -96,31 +96,31 @@ class CodeBuffer implements StringBuffer {
           line.indentationLevel + other._indentationLevel, start)
         .._end = end
         .._buf.write(line._buf.toString());
-      other._lines.add(other._currentLine = other._lastLine = clone);
 
       // Adjust lastSpan
       if (line._lastSpan != null) {
-        var s = line._lastSpan.start, e = line._lastSpan.end;
+        var s = line._lastSpan.start;
+        var lastSpanColumn = ((line.indentationLevel + other._indentationLevel) *
+            other.space.length) +
+            line.text.indexOf(line._lastSpan.text);
         clone._lastSpan = new SourceSpan(
           new SourceLocation(
             offset + s.offset,
             sourceUrl: other.sourceUrl,
             line: clone.span.start.line,
-            column: column + s.column,
+            column: lastSpanColumn,
           ),
           new SourceLocation(
             offset + s.offset + line._lastSpan.length,
             sourceUrl: other.sourceUrl,
             line: clone.span.end.line,
-            column: column + e.column,
+            column: lastSpanColumn + line._lastSpan.length,
           ),
           line._lastSpan.text,
         );
-
-        print('Col: $column, s: ${s.column}, e: ${e.column} => ${line._lastSpan.text}');
       }
 
-      print(clone._lastSpan?.end?.toolString);
+      other._lines.add(other._currentLine = other._lastLine = clone);
 
       // Adjust length accordingly...
       other._length = offset + clone.span.length;
@@ -171,7 +171,7 @@ class CodeBuffer implements StringBuffer {
 
   @override
   void writeln([Object obj = ""]) {
-    if (obj != null) write(obj);
+    if (obj != null && obj != '') write(obj);
     _currentLine = null;
     _length++;
   }

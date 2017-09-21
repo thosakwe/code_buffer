@@ -1,5 +1,10 @@
 name: code_buffer
+version: 1.0.0
 description: An advanced StringBuffer geared toward generating code, and source maps.
+author: Tobe O <thosakwe@gmail.com>
+homepage: https://github.com/thosakwe/code_buffer
+environment:
+  sdk: ">=1.8.0"
 dependencies:
   charcode: ^1.0.0
   source_span: ^1.0.0
