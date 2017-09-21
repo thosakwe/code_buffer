@@ -53,3 +53,11 @@ void someFunc(CodeBuffer buf) {
   expect(buf.lastLine.lastSpan.start.column, 5);
 }
 ```
+
+You can copy a `CodeBuffer` into another, heeding indentation rules:
+
+```dart
+void yetAnotherFunc(CodeBuffer a, CodeBuffer b) {
+  b.copyInto(a);
+}
+```
