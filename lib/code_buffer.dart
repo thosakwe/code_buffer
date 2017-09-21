@@ -1,0 +1,224 @@
+import 'package:source_span/source_span.dart';
+
+/// An advanced StringBuffer geared toward generating code, and source maps.
+class CodeBuffer implements StringBuffer {
+  /// The character sequence used to represent a line break.
+  final String newline;
+
+  /// The character sequence used to represent a space/tab.
+  final String space;
+
+  /// The source URL to be applied to all generated [SourceSpan] instances.
+  final sourceUrl;
+
+  /// If `true` (default: `false`), then an additional [newline] will be inserted at the end of the generated string.
+  final bool trailingNewline;
+
+  final List<CodeBufferLine> _lines = [];
+  CodeBufferLine _currentLine, _lastLine;
+  int _indentationLevel = 0;
+  int _length = 0;
+
+  CodeBuffer(
+      {this.space: '  ',
+      this.newline: '\n',
+      this.trailingNewline: false,
+      this.sourceUrl});
+
+  /// The last line created within this buffer.
+  CodeBufferLine get lastLine => _lastLine;
+
+  /// Returns an immutable collection of the [CodeBufferLine]s within this instance.
+  List<CodeBufferLine> get lines =>
+      new List<CodeBufferLine>.unmodifiable(_lines);
+
+  @override
+  bool get isEmpty => _lines.isEmpty;
+
+  @override
+  bool get isNotEmpty => _lines.isNotEmpty;
+
+  @override
+  int get length => _length;
+
+  CodeBufferLine _createLine() {
+    var start = new SourceLocation(
+      _length,
+      sourceUrl: sourceUrl,
+      line: _lines.length,
+      column: _indentationLevel * space.length,
+    );
+    var line = new CodeBufferLine._(_indentationLevel, start).._end = start;
+    _lines.add(_lastLine = line);
+    return line;
+  }
+
+  /// Increments the indentation level.
+  void indent() {
+    _indentationLevel++;
+  }
+
+  /// Decrements the indentation level, if it is greater than `0`.
+  void outdent() {
+    if (_indentationLevel > 0) _indentationLevel--;
+  }
+
+  /// Copies the contents of this [CodeBuffer] into another, preserving indentation and source mapping information.
+  void copyInto(CodeBuffer other) {
+    if (_lines.isEmpty) return;
+    int i = 0;
+
+    for (var line in _lines) {
+      // To compute offset:
+      //   1. Find current length of other
+      //   2. Add length of its newline
+      //   3. Add indentation
+      var column = (other._indentationLevel + line.indentationLevel) *
+          other.space.length;
+      var offset = other._length + other.newline.length + column;
+
+      // Re-compute start + end
+      var start = new SourceLocation(
+        offset,
+        sourceUrl: other.sourceUrl,
+        line: other._lines.length + i,
+        column: column,
+      );
+
+      var end = new SourceLocation(
+        offset + line.span.length,
+        sourceUrl: other.sourceUrl,
+        line: start.line,
+        column: column + line._buf.length,
+      );
+
+      var clone = new CodeBufferLine._(
+          line.indentationLevel + other._indentationLevel, start)
+        .._end = end
+        .._buf.write(line._buf.toString());
+      other._lines.add(other._currentLine = other._lastLine = clone);
+
+      // Adjust lastSpan
+      if (line._lastSpan != null) {
+        var s = line._lastSpan.start, e = line._lastSpan.end;
+        clone._lastSpan = new SourceSpan(
+          new SourceLocation(
+            offset + s.offset,
+            sourceUrl: other.sourceUrl,
+            line: clone.span.start.line,
+            column: column + s.column,
+          ),
+          new SourceLocation(
+            offset + s.offset + line._lastSpan.length,
+            sourceUrl: other.sourceUrl,
+            line: clone.span.end.line,
+            column: column + e.column,
+          ),
+          line._lastSpan.text,
+        );
+
+        print('Col: $column, s: ${s.column}, e: ${e.column} => ${line._lastSpan.text}');
+      }
+
+      print(clone._lastSpan?.end?.toolString);
+
+      // Adjust length accordingly...
+      other._length = offset + clone.span.length;
+      i++;
+    }
+
+    other.writeln();
+  }
+
+  @override
+  void clear() {
+    _lines.clear();
+    _length = _indentationLevel = 0;
+    _currentLine = null;
+  }
+
+  @override
+  void writeCharCode(int charCode) {
+    _currentLine ??= _createLine();
+    _currentLine._buf.writeCharCode(charCode);
+    var end = _currentLine._end;
+    _currentLine._end = new SourceLocation(
+      end.offset + 1,
+      sourceUrl: end.sourceUrl,
+      line: end.line,
+      column: end.column + 1,
+    );
+    _length++;
+    _currentLine._lastSpan = new SourceSpan(
+        end, _currentLine._end, new String.fromCharCode(charCode));
+  }
+
+  @override
+  void write(Object obj) {
+    var msg = obj.toString();
+    _currentLine ??= _createLine();
+    _currentLine._buf.write(msg);
+    var end = _currentLine._end;
+    _currentLine._end = new SourceLocation(
+      end.offset + msg.length,
+      sourceUrl: end.sourceUrl,
+      line: end.line,
+      column: end.column + msg.length,
+    );
+    _length += msg.length;
+    _currentLine._lastSpan = new SourceSpan(end, _currentLine._end, msg);
+  }
+
+  @override
+  void writeln([Object obj = ""]) {
+    if (obj != null) write(obj);
+    _currentLine = null;
+    _length++;
+  }
+
+  @override
+  void writeAll(Iterable objects, [String separator = ""]) {
+    write(objects.join(separator));
+  }
+
+  @override
+  String toString() {
+    var buf = new StringBuffer();
+    int i = 0;
+
+    for (var line in lines) {
+      if (i++ > 0) buf.write(newline);
+      for (int j = 0; j < line.indentationLevel; j++) buf.write(space);
+      buf.write(line._buf.toString());
+    }
+
+    if (trailingNewline == true) buf.write(newline);
+
+    return buf.toString();
+  }
+}
+
+/// Represents a line of text within a [CodeBuffer].
+class CodeBufferLine {
+  /// Mappings from one [SourceSpan] to another, to aid with generating dynamic source maps.
+  final Map<SourceSpan, SourceSpan> sourceMappings = {};
+
+  /// The level of indentation preceding this line.
+  final int indentationLevel;
+
+  final SourceLocation _start;
+  final StringBuffer _buf = new StringBuffer();
+  SourceLocation _end;
+  SourceSpan _lastSpan;
+
+  CodeBufferLine._(this.indentationLevel, this._start);
+
+  /// The [SourceSpan] corresponding to the last text written to this line.
+  SourceSpan get lastSpan => _lastSpan;
+
+  /// The [SourceSpan] corresponding to this entire line.
+  SourceSpan get span => new SourceSpan(_start, _end, _buf.toString());
+
+  /// The text within this line.
+  String get text => _buf.toString();
+}

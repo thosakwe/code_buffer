@@ -1,0 +1,7 @@
+name: code_buffer
+description: An advanced StringBuffer geared toward generating code, and source maps.
+dependencies:
+  charcode: ^1.0.0
+  source_span: ^1.0.0
+dev_dependencies:
+  test: ^0.12.0
