@@ -25,6 +25,10 @@ class CodeBuffer implements StringBuffer {
       this.trailingNewline: false,
       this.sourceUrl});
 
+  /// Creates a [CodeBuffer] that does not emit additional whitespace.
+  factory CodeBuffer.noWhitespace({sourceUrl}) => new CodeBuffer(
+      space: '', newline: '', trailingNewline: false, sourceUrl: sourceUrl);
+
   /// The last line created within this buffer.
   CodeBufferLine get lastLine => _lastLine;
 
@@ -100,9 +104,10 @@ class CodeBuffer implements StringBuffer {
       // Adjust lastSpan
       if (line._lastSpan != null) {
         var s = line._lastSpan.start;
-        var lastSpanColumn = ((line.indentationLevel + other._indentationLevel) *
-            other.space.length) +
-            line.text.indexOf(line._lastSpan.text);
+        var lastSpanColumn =
+            ((line.indentationLevel + other._indentationLevel) *
+                    other.space.length) +
+                line.text.indexOf(line._lastSpan.text);
         clone._lastSpan = new SourceSpan(
           new SourceLocation(
             offset + s.offset,
